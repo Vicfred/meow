@@ -1,5 +1,7 @@
 module Main where
 
+import Data.List
+import System.Exit
 import System.IO                      -- base
 import qualified Network.Socket as N  -- network
 
@@ -38,7 +40,28 @@ listen :: Handle -> IO ()
 listen h = forever $ do
     line <- hGetLine h
     putStrLn line
+    let s = init line
+    if isPing s then pong s else eval h (clean s)
   where
     forever :: IO () -> IO ()
     forever a = do a; forever a
+
+    clean :: String -> String
+    clean = drop 1 . dropWhile (/= ':') . drop 1
+
+    isPing :: String -> Bool
+    isPing x = "PING :" `isPrefixOf` x
+
+    pong :: String -> IO()
+    pong x = write h "PONG" (':' : drop 6 x)
+
+-- Dispatch a command
+eval :: Handle -> String -> IO ()
+eval h "!quit"                   = write h "QUIT" ":Exiting" >> exitSuccess
+eval h x | "!id " `isPrefixOf` x = privmsg h (drop 4 x)
+eval _   _                       = return () -- ignore everything else
+
+-- Send a privmsg to the channel
+privmsg :: Handle -> String -> IO ()
+privmsg h s = write h "PRIVMSG" (myChan ++ " :" ++ s)
 
